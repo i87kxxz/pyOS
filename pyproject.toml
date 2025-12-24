@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyOS"
+version = "0.1.0"
+description = "Build complete operating systems using Python - compiles to Assembly and Machine Code"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Operating System Kernels",
+]
+dependencies = [
+    "click>=8.0.0",
+]
+
+[project.scripts]
+pyos = "pyos.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/pyos/pyos"
+Documentation = "https://pyos.dev/docs"
+Repository = "https://github.com/pyos/pyos"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+pyos = ["boot/*.asm", "boot/*.bin"]
