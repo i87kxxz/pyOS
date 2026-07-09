@@ -116,7 +116,7 @@ class Interrupts:
         Example:
             def my_handler(frame):
                 pass
-            Interrupts.register(0x21, my_handler)
+            Interrupts.register(33, my_handler)  # IRQ1 keyboard
         """
         cls._handlers[interrupt_number] = handler
         cls._operations.append({

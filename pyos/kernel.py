@@ -65,6 +65,12 @@ class Kernel:
             enable_interrupts: Enable interrupt handling
             enable_gdt: Enable Global Descriptor Table
         """
+        if arch != "x86":
+            raise ValueError(
+                "Only arch='x86' is supported.\n"
+                "  Why: the C runtime and bootloader are 32-bit protected mode.\n"
+                "  Hint: use Kernel(arch='x86')"
+            )
         self.config = KernelConfig(
             arch=Architecture(arch),
             stack_size=stack_size,
@@ -99,8 +105,8 @@ class Kernel:
                 event="boot",
                 priority=priority,
             ))
-            # Sort by priority (higher first)
-            self._boot_functions.sort(key=lambda x: -x.priority)
+            # Lower priority number runs first (matches README / codegen)
+            self._boot_functions.sort(key=lambda x: x.priority)
             return f
         
         if func is not None:
@@ -109,7 +115,7 @@ class Kernel:
     
     def on_keypress(self, func: Callable = None, *, key: str = None):
         """
-        Decorator to handle keyboard input.
+        Decorator to handle keyboard input at runtime (IRQ1).
         
         Example:
             @kernel.on_keypress
@@ -117,11 +123,13 @@ class Kernel:
                 Screen.print(f"Pressed: {key}")
         """
         def decorator(f: Callable) -> Callable:
-            self._keypress_handlers.append(KernelFunction(
+            handler = KernelFunction(
                 name=f.__name__,
                 func=f,
                 event="keypress",
-            ))
+            )
+            handler.key_filter = key
+            self._keypress_handlers.append(handler)
             return f
         
         if func is not None:
@@ -133,7 +141,7 @@ class Kernel:
         Decorator to handle a specific interrupt.
         
         Example:
-            @kernel.on_interrupt(0x21)  # Keyboard interrupt
+            @kernel.on_interrupt(33)  # IRQ1 keyboard (vector 33)
             def keyboard_handler():
                 pass
         """
@@ -206,10 +214,10 @@ class Kernel:
     
     def compile(self) -> str:
         """
-        Compile the kernel to Assembly code.
+        Compile the kernel to C glue that calls the freestanding runtime.
         
         Returns:
-            The generated Assembly code as a string.
+            Generated C source as a string.
         """
         from .compiler.codegen import CodeGenerator
         
@@ -219,35 +227,34 @@ class Kernel:
     
     def assemble(self) -> bytes:
         """
-        Assemble the kernel to machine code.
+        Build the kernel image bytes (bootloader + linked C kernel).
         
         Returns:
-            The binary machine code.
+            The binary image contents.
         """
-        if self._compiled_asm is None:
-            self.compile()
-        
-        from .compiler.assembler import Assembler
-        
-        assembler = Assembler(self.config.arch)
-        self._compiled_binary = assembler.assemble(self._compiled_asm)
+        from .builder import OSBuilder
+        import tempfile
+        from pathlib import Path
+
+        builder = OSBuilder(self)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "kernel.bin"
+            builder.build_bin(str(path))
+            self._compiled_binary = path.read_bytes()
         return self._compiled_binary
     
-    def build(self, output: str, format: str = "iso") -> str:
+    def build(self, output: str, format: str = "bin") -> str:
         """
         Build the complete OS image.
         
         Args:
             output: Output file path
-            format: Output format ("iso" or "bin")
+            format: Output format ("bin" recommended, or "iso" floppy-compatible image)
         
         Returns:
             Path to the generated file.
         """
         from .builder import OSBuilder
-        
-        if self._compiled_binary is None:
-            self.assemble()
         
         builder = OSBuilder(self)
         

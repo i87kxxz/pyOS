@@ -12,7 +12,15 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        "pyos": ["boot/*.asm", "boot/*.bin"],
+        "pyos": [
+            "boot/*.asm",
+            "boot/*.bin",
+            "runtime/**/*.c",
+            "runtime/**/*.h",
+            "runtime/**/*.asm",
+            "runtime/**/*.S",
+            "runtime/*.ld",
+        ],
     },
     install_requires=[
         "click>=8.0.0",

@@ -1,8 +1,12 @@
-# Build outputs
+# Generated OS images / debug maps
 *.iso
 *.bin
 *.o
 *.elf
+*.map
+*.symbols.json
+*_debug.asm
+glue.c
 
 # Python
 __pycache__/
@@ -40,6 +44,3 @@ env/
 # OS
 .DS_Store
 Thumbs.db
-
-# Debug files
-*_debug.asm

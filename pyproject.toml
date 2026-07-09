@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyOS"
 version = "0.1.0"
-description = "Build complete operating systems using Python - compiles to Assembly and Machine Code"
+description = "Build operating systems in Python — freestanding C runtime + ASM bootloader"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -37,4 +37,4 @@ Repository = "https://github.com/pyos/pyos"
 where = ["."]
 
 [tool.setuptools.package-data]
-pyos = ["boot/*.asm", "boot/*.bin"]
+pyos = ["boot/*.asm", "boot/*.bin", "runtime/**/*.c", "runtime/**/*.h", "runtime/**/*.asm", "runtime/**/*.S", "runtime/*.ld"]
