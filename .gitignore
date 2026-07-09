@@ -1,46 +1,125 @@
-# Generated OS images / debug maps
+# =============================================================================
+# pyOS — comprehensive .gitignore
+# =============================================================================
+
+# ----- Generated OS images & build artifacts -----
 *.iso
 *.bin
 *.o
+*.obj
 *.elf
 *.map
 *.symbols.json
 *_debug.asm
 glue.c
+glue_*.c
+*.pe
+*.img
+*.floppy
 
-# Python
+# Lab / probe outputs
+examples/lab/out/
+**/lab/out/
+*.serial.log
+*_serial.log
+*_serial.txt
+*_serial_human.txt
+debugcon*.log
+qemu.log
+*.log
+
+# ----- Python -----
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
 .Python
 build/
+!pyos/build/
+!pyos/build/**
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+!pyos/kernel/lib/
+!pyos/kernel/lib/**
 parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Virtual environments
+# Packaging / unpacked sdist junk
+pyos_kernel-*/
+*.manifest
+*.spec
+
+# ----- Virtual environments -----
+.venv/
 venv/
 ENV/
 env/
+.env/
 
-# IDE
+# ----- Secrets / credentials (never commit) -----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.pypirc
+.npmrc
+credentials.json
+secrets/
+
+# ----- Test / coverage / type checkers -----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.cache/
+
+# ----- IDE / editors -----
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
 
-# OS
+# ----- OS junk -----
 .DS_Store
 Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ----- Misc -----
+*.tmp
+*.temp
+*.bak
+*.orig
+.cursor/
+agent-transcripts/
+
+# ----- QEMU -----
+*.qcow2
+*.vdi
+*.vmdk

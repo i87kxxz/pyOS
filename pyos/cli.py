@@ -13,12 +13,12 @@ from .debug import explain_build_error, format_serial_log, load_symbol_hints
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="pyOS")
+@click.version_option(version="1.0.0", prog_name="pyOS")
 def main():
     """
-    pyOS - Build Operating Systems with Python
+    pyOS - Build real operating systems with a Python DSL.
 
-    Write your OS in Python. pyOS builds a real C+ASM kernel under the hood.
+    Your Python records intent; pyOS builds a freestanding C+ASM kernel.
     """
     pass
 
@@ -105,7 +105,7 @@ def debug(image: str, memory: int, gdb_mode: bool, timeout: int):
         pyos debug myos.bin
     """
     from .emulator import QEMURunner, QEMUError
-    from .toolchain import Toolchain
+    from .build.toolchain import Toolchain
 
     tools = Toolchain()
     if not tools.qemu:
@@ -197,7 +197,7 @@ def asm(source: str, output: str):
 @main.command()
 def check():
     """Check if required tools are installed (GCC -m32, NASM, QEMU)."""
-    from .toolchain import Toolchain
+    from .build.toolchain import Toolchain
 
     click.echo("Checking required tools...")
     click.echo("")

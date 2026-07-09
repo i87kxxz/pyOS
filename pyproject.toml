@@ -3,14 +3,28 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyOS"
-version = "0.1.0"
-description = "Build operating systems in Python — freestanding C runtime + ASM bootloader"
+name = "pyOS-kernel"
+version = "1.0.0"
+description = "Build real x86 operating systems with a Python DSL — freestanding C kernel + ASM bootloader"
 readme = "README.md"
-license = {text = "MIT"}
+license = { file = "LICENSE" }
 requires-python = ">=3.8"
+authors = [
+    {name = "i87kxxzz", email = "redtgx32@gmail.com"},
+]
+keywords = [
+    "operating-system",
+    "os",
+    "kernel",
+    "x86",
+    "bootloader",
+    "qemu",
+    "nasm",
+    "systems-programming",
+    "cybersecurity",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -25,16 +39,32 @@ dependencies = [
     "click>=8.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
 [project.scripts]
 pyos = "pyos.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/pyos/pyos"
-Documentation = "https://pyos.dev/docs"
-Repository = "https://github.com/pyos/pyos"
+Homepage = "https://github.com/i87kxxz/pyOS"
+Documentation = "https://github.com/i87kxxz/pyOS#readme"
+Repository = "https://github.com/i87kxxz/pyOS"
+Issues = "https://github.com/i87kxxz/pyOS/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["pyos*"]
 
 [tool.setuptools.package-data]
-pyos = ["boot/*.asm", "boot/*.bin", "runtime/**/*.c", "runtime/**/*.h", "runtime/**/*.asm", "runtime/**/*.S", "runtime/*.ld"]
+pyos = [
+    "boot/*.asm",
+    "boot/*.bin",
+    "kernel/**/*.c",
+    "kernel/**/*.h",
+    "kernel/**/*.asm",
+    "kernel/**/*.S",
+    "kernel/*.ld",
+    "kernel/include/*.h",
+]

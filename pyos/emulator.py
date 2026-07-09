@@ -9,7 +9,7 @@ import shutil
 from typing import Optional, List
 from pathlib import Path
 
-from .toolchain import Toolchain
+from .build.toolchain import Toolchain
 
 
 class QEMUError(Exception):

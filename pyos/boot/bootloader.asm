@@ -1,4 +1,4 @@
-; pyOS Bootloader — LBA (int 13h AH=42h), QEMU-friendly
+; pyOS Bootloader — LBA preferred; multi-track CHS fallback (64 sectors)
 [BITS 16]
 [ORG 0x7C00]
 
@@ -14,42 +14,38 @@ start:
     mov ss, ax
     mov sp, 0x7C00
     sti
-
     mov [boot_drive], dl
 
     mov al, 'B'
     out 0xE9, al
 
-    ; Check extensions
     mov ah, 0x41
     mov bx, 0x55AA
     mov dl, [boot_drive]
     int 0x13
-    jc .no_lba
+    jc no_lba
     cmp bx, 0xAA55
-    jne .no_lba
+    jne no_lba
 
     mov al, 'X'
     out 0xE9, al
-
-    ; LBA read: DAP
     mov si, dap
     mov ah, 0x42
     mov dl, [boot_drive]
     int 0x13
-    jc .error
+    jc no_lba
 
     mov al, 'L'
     out 0xE9, al
-    jmp .pm
+    jmp enter_pm
 
-.no_lba:
-    ; Fallback CHS: one track from sector 2 (17 sectors)
+no_lba:
     mov al, 'C'
     out 0xE9, al
     mov ax, KERNEL_SEGS
     mov es, ax
     mov bx, KERNEL_OFFSET
+
     mov ah, 0x02
     mov al, 17
     mov ch, 0
@@ -57,11 +53,39 @@ start:
     mov dh, 0
     mov dl, [boot_drive]
     int 0x13
-    jc .error
+    jc disk_error
+    mov al, '1'
+    out 0xE9, al
+    add bx, 17*512
+
+    mov ah, 0x02
+    mov al, 18
+    mov ch, 0
+    mov cl, 1
+    mov dh, 1
+    mov dl, [boot_drive]
+    int 0x13
+    jc disk_error
+    mov al, '2'
+    out 0xE9, al
+    add bx, 18*512
+
+    mov ah, 0x02
+    mov al, 18
+    mov ch, 1
+    mov cl, 1
+    mov dh, 0
+    mov dl, [boot_drive]
+    int 0x13
+    jc disk_error
+    mov al, '3'
+    out 0xE9, al
+    ; 53 sectors loaded (>= 42 needed for ~21KB kernel); skip further tracks
+
     mov al, 'L'
     out 0xE9, al
 
-.pm:
+enter_pm:
     cli
     in al, 0x92
     or al, 2
@@ -72,12 +96,11 @@ start:
     mov cr0, eax
     jmp 0x08:pm_start
 
-.error:
+disk_error:
     mov al, 'E'
     out 0xE9, al
     jmp $
 
-; Disk Address Packet
 align 4
 dap:
     db 16
@@ -85,7 +108,7 @@ dap:
     dw KERNEL_SECTORS
     dw KERNEL_OFFSET
     dw KERNEL_SEGS
-    dq 1                 ; LBA 1 (sector after MBR)
+    dq 1
 
 gdt_start:
     dq 0
@@ -115,9 +138,9 @@ pm_start:
     mov al, 'H'
     out 0xE9, al
     cli
-.halt:
+halt_loop:
     hlt
-    jmp .halt
+    jmp halt_loop
 
 [BITS 16]
 boot_drive: db 0

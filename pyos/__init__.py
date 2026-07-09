@@ -1,22 +1,50 @@
 """
-pyOS - Build Operating Systems with Python
+pyOS - Build real operating systems with a Python DSL
 """
 
-from .kernel import Kernel
-from .drivers.screen import Screen
-from .drivers.keyboard import Keyboard
-from .memory.manager import Memory
-from .memory.gdt import GDT
-from .interrupts.handler import Interrupts
-from .syscalls.handler import SysCall
+from .api import (
+    GDT,
+    Architecture,
+    BuildTimeOnlyError,
+    COLOR_NAMES,
+    CapabilityError,
+    Color,
+    InterruptType,
+    Interrupts,
+    Kernel,
+    KernelConfig,
+    KeyCode,
+    KeyEvent,
+    Keyboard,
+    Memory,
+    Screen,
+    SysCall,
+    SysCallNumber,
+    UnsupportedOpError,
+)
+from .api.fs import File
+from .api.process import Process
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __all__ = [
+    "Architecture",
+    "BuildTimeOnlyError",
+    "COLOR_NAMES",
+    "CapabilityError",
+    "Color",
+    "File",
+    "GDT",
+    "InterruptType",
+    "Interrupts",
     "Kernel",
-    "Screen", 
+    "KernelConfig",
+    "KeyCode",
+    "KeyEvent",
     "Keyboard",
     "Memory",
-    "GDT",
-    "Interrupts",
+    "Process",
+    "Screen",
     "SysCall",
+    "SysCallNumber",
+    "UnsupportedOpError",
 ]
