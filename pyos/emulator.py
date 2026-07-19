@@ -10,6 +10,7 @@ from typing import Optional, List
 from pathlib import Path
 
 from .build.toolchain import Toolchain
+from .build.rootfs import virtio_disk_args, virtio_net_args
 
 
 class QEMUError(Exception):
@@ -47,8 +48,27 @@ class QEMURunner:
         return "qemu-system-i386" if self.arch == "x86" else "qemu-system-x86_64"
 
     def _boot_args(self, image_path: str) -> List[str]:
-        # pyOS images are raw floppy disks (bootloader + kernel)
+        """Multiboot ELF → -kernel; legacy raw floppy → -drive if=floppy."""
+        path = Path(image_path)
+        try:
+            magic = path.read_bytes()[:4]
+        except OSError:
+            magic = b""
+        if magic == b"\x7fELF":
+            return ["-kernel", str(path)]
         return ["-drive", f"format=raw,file={image_path},if=floppy"]
+
+    @staticmethod
+    def disk_args(disk_path: Optional[str]) -> List[str]:
+        if not disk_path:
+            return []
+        return virtio_disk_args(disk_path)
+
+    @staticmethod
+    def net_args(enabled: bool = True, hostfwd: Optional[str] = None) -> List[str]:
+        if not enabled:
+            return []
+        return virtio_net_args(hostfwd=hostfwd)
 
     def run(
         self,
@@ -57,6 +77,9 @@ class QEMURunner:
         debug: bool = False,
         extra_args: Optional[List[str]] = None,
         serial_stdio: bool = False,
+        disk: Optional[str] = None,
+        network: bool = False,
+        hostfwd: Optional[str] = None,
     ) -> subprocess.Popen:
         if not Path(image_path).exists():
             raise QEMUError(
@@ -65,9 +88,13 @@ class QEMURunner:
             )
 
         cmd = [self.qemu_path]
-        cmd.extend(self._boot_args(image_path))
-        cmd.extend(["-boot", "order=a"])
+        boot_args = self._boot_args(image_path)
+        cmd.extend(boot_args)
+        if boot_args[:1] != ["-kernel"]:
+            cmd.extend(["-boot", "order=a"])
         cmd.extend(["-m", str(memory)])
+        cmd.extend(self.disk_args(disk))
+        cmd.extend(self.net_args(network, hostfwd=hostfwd))
 
         if serial_stdio or debug:
             cmd.extend(["-serial", "stdio", "-debugcon", "stdio"])
@@ -97,8 +124,10 @@ class QEMURunner:
         image_path: str,
         memory: int = 128,
         timeout: Optional[int] = None,
+        disk: Optional[str] = None,
+        network: bool = False,
     ) -> int:
-        process = self.run(image_path, memory)
+        process = self.run(image_path, memory, disk=disk, network=network)
         try:
             return process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -109,18 +138,31 @@ class QEMURunner:
         self,
         image_path: str,
         memory: int = 128,
-    ) -> subprocess.Popen:
-        return self.run(image_path, memory, serial_stdio=True, extra_args=["-display", "none"])
-
-    def run_headless(
-        self,
-        image_path: str,
-        memory: int = 128,
+        disk: Optional[str] = None,
+        network: bool = False,
     ) -> subprocess.Popen:
         return self.run(
             image_path,
             memory,
             serial_stdio=True,
+            disk=disk,
+            network=network,
+            extra_args=["-display", "none"],
+        )
+
+    def run_headless(
+        self,
+        image_path: str,
+        memory: int = 128,
+        disk: Optional[str] = None,
+        network: bool = False,
+    ) -> subprocess.Popen:
+        return self.run(
+            image_path,
+            memory,
+            serial_stdio=True,
+            disk=disk,
+            network=network,
             extra_args=["-display", "none"],
         )
 

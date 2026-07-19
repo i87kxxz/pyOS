@@ -8,6 +8,8 @@ void serial_write(char c);
 void serial_write_str(const char *s);
 void serial_write_hex(u32 value);
 void serial_write_dec(u32 value);
+pyos_bool serial_can_read(void);
+i32 serial_read(void); /* -1 if empty, else byte 0..255 */
 
 void debug_log(const char *msg);
 void debug_logf(const char *prefix, const char *msg);

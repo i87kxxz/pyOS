@@ -3,8 +3,12 @@ OUTPUT_FORMAT(pei-i386)
 
 SECTIONS
 {
-    /* Force low addresses; MinGW PE image base overridden via ld flags */
-    . = 0x1000;
+    /* Multiboot / QEMU -kernel load address (1 MiB). */
+    . = 0x100000;
+
+    .multiboot : {
+        *(.multiboot)
+    }
 
     .text : {
         *(.text)

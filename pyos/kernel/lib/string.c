@@ -26,6 +26,18 @@ void *memcpy(void *dst, const void *src, u32 n) {
     return dst;
 }
 
+void *memmove(void *dst, const void *src, u32 n) {
+    u8 *d = (u8 *)dst;
+    const u8 *s = (const u8 *)src;
+    if (d == s || n == 0) return dst;
+    if (d < s) {
+        for (u32 i = 0; i < n; i++) d[i] = s[i];
+    } else {
+        for (u32 i = n; i > 0; i--) d[i - 1] = s[i - 1];
+    }
+    return dst;
+}
+
 char *strncpy(char *dst, const char *src, u32 n) {
     u32 i = 0;
     for (; i < n && src[i]; i++) dst[i] = src[i];

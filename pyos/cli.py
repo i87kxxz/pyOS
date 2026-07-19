@@ -8,6 +8,7 @@ import click
 import sys
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from .debug import explain_build_error, format_serial_log, load_symbol_hints
 
@@ -77,14 +78,22 @@ def build(source: str, output: str, fmt: str, arch: str, verbose: bool):
 @click.argument("image", type=click.Path(exists=True))
 @click.option("-m", "--memory", default=128, help="Memory in MB")
 @click.option("--gdb", "gdb_mode", is_flag=True, help="Pause and wait for GDB on :1234")
-def run(image: str, memory: int, gdb_mode: bool):
+@click.option("--disk", default=None, type=click.Path(exists=True), help="ext2 rootfs disk image (virtio-blk)")
+@click.option("--net/--no-net", default=False, help="Attach virtio-net (user networking)")
+def run(image: str, memory: int, gdb_mode: bool, disk: Optional[str], net: bool):
     """Run OS image in QEMU."""
     from .emulator import QEMURunner, QEMUError
 
     click.echo(f"Running {image} in QEMU...")
+    if disk:
+        click.echo(f"  Disk: {disk} (virtio-blk)")
+    if net:
+        click.echo("  Net: virtio-net-pci (user)")
     try:
         runner = QEMURunner()
-        process = runner.run(image, memory=memory, debug=gdb_mode, serial_stdio=False)
+        process = runner.run(
+            image, memory=memory, debug=gdb_mode, serial_stdio=False, disk=disk, network=net
+        )
         click.echo("QEMU started. Close the window to exit.")
         process.wait()
     except QEMUError as e:
@@ -97,7 +106,8 @@ def run(image: str, memory: int, gdb_mode: bool):
 @click.option("-m", "--memory", default=128, help="Memory in MB")
 @click.option("--gdb", "gdb_mode", is_flag=True, help="Also enable GDB stub")
 @click.option("--timeout", default=8, help="Seconds to capture serial log (headless)")
-def debug(image: str, memory: int, gdb_mode: bool, timeout: int):
+@click.option("--disk", default=None, type=click.Path(exists=True), help="ext2 rootfs disk image")
+def debug(image: str, memory: int, gdb_mode: bool, timeout: int, disk: Optional[str]):
     """
     Human-readable debug: run with serial log and explain panics.
 
@@ -120,21 +130,23 @@ def debug(image: str, memory: int, gdb_mode: bool, timeout: int):
             click.echo(h)
         click.echo("")
 
-    cmd = [
-        tools.qemu,
-        "-drive",
-        f"format=raw,file={image},if=floppy",
-        "-boot",
-        "order=a",
-        "-m",
-        str(memory),
-        "-serial",
-        "stdio",
-        "-display",
-        "none",
-        "-no-reboot",
-        "-no-shutdown",
-    ]
+    boot_args = QEMURunner()._boot_args(image)
+    cmd = [tools.qemu, *boot_args]
+    if boot_args[:1] != ["-kernel"]:
+        cmd.extend(["-boot", "order=a"])
+    cmd.extend(
+        [
+            "-m",
+            str(memory),
+            "-serial",
+            "stdio",
+            "-display",
+            "none",
+            "-no-reboot",
+            "-no-shutdown",
+        ]
+    )
+    cmd.extend(QEMURunner.disk_args(disk))
     if gdb_mode:
         cmd.extend(["-s", "-S"])
         click.echo("GDB stub on localhost:1234 (CPU paused)")
@@ -165,6 +177,19 @@ def debug(image: str, memory: int, gdb_mode: bool, timeout: int):
     except Exception as e:
         click.echo(explain_build_error(f"Error: {e}"), err=True)
         sys.exit(1)
+
+
+@main.command("mkrootfs")
+@click.option("-o", "--output", default="rootfs.img", help="Output disk image path")
+@click.option("--motd", default="Welcome to pyOS\n", help="Contents of /etc/motd")
+def mkrootfs(output: str, motd: str):
+    """Create an ext2 rootfs image (/etc/motd, /bin/busybox, /init)."""
+    from .build.rootfs import create_rootfs
+
+    path = create_rootfs(output, motd=motd)
+    click.echo(f"Created {path} ({path.stat().st_size} bytes)")
+    click.echo(f"  Contains /init (ash), /bin/busybox when third_party binary present")
+    click.echo(f"  Run with: pyos run myos.bin --disk {path}")
 
 
 @main.command("c")

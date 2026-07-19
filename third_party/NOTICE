@@ -1,0 +1,20 @@
+BusyBox third-party binary
+==========================
+
+File: third_party/busybox-i386-static
+
+Source:
+  https://busybox.net/downloads/binaries/1.35.0-i686-linux-musl/busybox
+
+Version: BusyBox 1.35.0 (i686, statically linked against musl)
+
+License: GPL-2.0 (BusyBox)
+  See https://busybox.net/license.html
+  Full source: https://busybox.net/downloads/
+
+Refresh:
+  python scripts/fetch_busybox.py
+
+pyOS also ships a small freestanding ash (built via scripts/build_ash.py)
+used as /init when a full BusyBox ash session needs more kernel APIs.
+The BusyBox binary is installed at /bin/busybox in the rootfs.

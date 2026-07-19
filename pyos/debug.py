@@ -85,5 +85,7 @@ def explain_build_error(message: str) -> str:
     if "undefined reference" in lower:
         text += "\n  → A C symbol is missing — runtime/glue mismatch; run pyos check and rebuild."
     if "too large" in lower:
-        text += "\n  → Kernel exceeded floppy load size; shorten prints or raise KERNEL_SECTORS."
+        text += "\n  → Kernel image exceeded MAX_KERNEL_BYTES; reduce glue/seeds or raise the limit in builder.py."
+    if "multiboot" in lower:
+        text += "\n  → Multiboot header missing — check start.S .multiboot section and linker.ld."
     return text

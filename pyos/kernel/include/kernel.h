@@ -16,6 +16,7 @@ typedef struct {
     pyos_bool enable_user_mode;
     pyos_bool enable_processes;
     pyos_bool enable_filesystem;
+    pyos_bool enable_network;
     pyos_bool debug_lab;
     pyos_bool keypress_echo;
 } KernelConfig;

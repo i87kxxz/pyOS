@@ -1,3 +1,5 @@
+; pyOS legacy floppy bootloader (kept for reference).
+; Primary boot path is Multiboot ELF via QEMU -kernel (see start.S).
 ; pyOS Bootloader — LBA preferred; multi-track CHS fallback (64 sectors)
 [BITS 16]
 [ORG 0x7C00]

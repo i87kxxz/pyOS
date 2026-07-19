@@ -15,6 +15,15 @@ void serial_init(void) {
     outb(COM1 + 4, 0x0B);
 }
 
+pyos_bool serial_can_read(void) {
+    return (inb(COM1 + 5) & 0x01) != 0;
+}
+
+i32 serial_read(void) {
+    if (!serial_can_read()) return -1;
+    return (i32)inb(COM1);
+}
+
 void serial_write(char c) {
     /* QEMU debugcon / Bochs port — always available in QEMU */
     outb(0xE9, (u8)c);

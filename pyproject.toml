@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyOS-kernel"
-version = "1.0.0"
-description = "Build real x86 operating systems with a Python DSL — freestanding C kernel + ASM bootloader"
+version = "1.0.1"
+description = "Build real x86 operating systems with a Python DSL — freestanding C kernel + Linux i386 ABI subset"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 authors = [
-    {name = "i87kxxzz", email = "redtgx32@gmail.com"},
+    {name = "i87kxxz", email = "redtgx32@gmail.com"},
 ]
 keywords = [
     "operating-system",

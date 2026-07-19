@@ -43,7 +43,8 @@ void kmain(void) {
     heap_init(g_kernel_config.heap_start, g_kernel_config.heap_size);
     debug_log("Heap ready (free-list)");
 
-    pmm_init(g_kernel_config.heap_start + g_kernel_config.heap_size, 0x100000);
+    /* 16 MiB frame pool — enough for BusyBox (~1MiB) + stacks/page tables */
+    pmm_init(g_kernel_config.heap_start + g_kernel_config.heap_size, 0x1000000);
     floppy_init();
     vfs_init();
     task_init();
@@ -51,7 +52,7 @@ void kmain(void) {
 
     if (g_kernel_config.enable_paging) {
         paging_init();
-        debug_log("Paging enabled (identity 4MB)");
+        debug_log("Paging enabled (identity map + CR3)");
     }
 
     if (g_kernel_config.enable_interrupts) {

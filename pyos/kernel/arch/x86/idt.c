@@ -3,9 +3,11 @@
 #include "keyboard.h"
 #include "io.h"
 #include "debug.h"
-#include "syscall.h"
 #include "types.h"
 #include "timer.h"
+#include "paging.h"
+#include "task.h"
+#include "kernel.h"
 
 struct idt_entry {
     u16 base_lo;
@@ -86,7 +88,11 @@ static void lidt(struct idt_ptr *ptr) {
 }
 
 void fault_handler(u32 int_no, u32 err_code, u32 eip) {
-    (void)err_code;
+    /* ISR 14: handle without returning to the faulting instruction. */
+    if (int_no == 14) {
+        page_fault_handler(err_code, eip);
+        return;
+    }
     const char *names[] = {
         "Divide by zero", "Debug", "NMI", "Breakpoint", "Overflow",
         "Bound range", "Invalid opcode", "Device not available",
@@ -110,11 +116,11 @@ void irq_handler(u32 irq) {
     } else if (irq == 1) {
         keyboard_irq_handler();
     }
+    /* EOI before possible context switch so the PIC is never left masked. */
     pic_send_eoi((u8)irq);
-}
-
-void syscall_handler_c(u32 num, u32 a1, u32 a2, u32 a3) {
-    (void)syscall_dispatch(num, a1, a2, a3);
+    if (irq == 0 && g_kernel_config.enable_processes && task_consume_reschedule()) {
+        task_schedule();
+    }
 }
 
 void idt_init(void) {

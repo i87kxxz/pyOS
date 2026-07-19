@@ -4,7 +4,7 @@ pyOS Kernel — Python DSL that builds a real freestanding C kernel.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
@@ -30,6 +30,10 @@ class KernelConfig:
     enable_user_mode: bool = False
     enable_processes: bool = False
     enable_filesystem: bool = False
+    enable_ext2: bool = False
+    enable_network: bool = False
+    enable_linux_abi: bool = True
+    rootfs_path: Optional[str] = None
     debug_level: str = "lab"  # quiet | lab
     keypress_mode: str = "echo"  # echo | custom
 
@@ -56,6 +60,12 @@ class Kernel:
     """
     Build-time OS definition. Boot handlers run on the host to record ops;
     the C kernel executes the generated glue at runtime.
+
+    Capability flags map to real C ``KernelConfig`` / boot glue. Unsupported
+    Python hooks raise ``CapabilityError`` / ``UnsupportedOpError`` — no silent stubs.
+
+    Linux i386 syscall numbers are the default ABI (``enable_linux_abi=True``).
+    There is no alternate numbering scheme; setting that flag to False is rejected.
     """
 
     def __init__(
@@ -69,6 +79,10 @@ class Kernel:
         enable_user_mode: bool = False,
         enable_processes: bool = False,
         enable_filesystem: bool = False,
+        enable_ext2: bool = False,
+        enable_network: bool = False,
+        enable_linux_abi: bool = True,
+        rootfs_path: Optional[str] = None,
         debug_level: str = "lab",
         keypress_mode: str = "echo",
     ):
@@ -82,11 +96,22 @@ class Kernel:
             raise ValueError("debug_level must be 'quiet' or 'lab'")
         if keypress_mode not in ("echo", "custom"):
             raise ValueError("keypress_mode must be 'echo' or 'custom'")
+        if not enable_linux_abi:
+            raise UnsupportedOpError(
+                "enable_linux_abi=False",
+                "Syscall numbers always match Linux i386 (syscall_32.tbl). "
+                "There is no legacy pyOS-only numbering path.",
+            )
 
         # stack grows down from stack_top; keep classic low-memory top
         stack_top = 0x90000
         if stack_size < 4096 or stack_size > 0x80000:
             raise ValueError("stack_size must be between 4096 and 524288")
+
+        # enable_ext2 is an honest alias: disk root is ext2 via virtio-blk when
+        # filesystem is on and QEMU is started with --disk. Either flag turns
+        # on the VFS mount path in generated glue.
+        fs_on = bool(enable_filesystem or enable_ext2)
 
         self.config = KernelConfig(
             arch=Architecture(arch),
@@ -98,11 +123,16 @@ class Kernel:
             enable_paging=enable_paging,
             enable_user_mode=enable_user_mode,
             enable_processes=enable_processes,
-            enable_filesystem=enable_filesystem,
+            enable_filesystem=fs_on,
+            enable_ext2=fs_on,
+            enable_network=enable_network,
+            enable_linux_abi=True,
+            rootfs_path=rootfs_path,
             debug_level=debug_level,
             keypress_mode=keypress_mode,
         )
 
+        # Reflect what the C kernel / QEMU path actually provides when flags are on.
         self.capabilities: Dict[str, bool] = {
             "screen_text": True,
             "heap_alloc": True,
@@ -110,11 +140,16 @@ class Kernel:
             "keyboard_irq": True,
             "timer": True,
             "syscalls": True,
+            "linux_abi": True,
             "paging": enable_paging,
             "user_mode": enable_user_mode,
             "processes": enable_processes,
-            "filesystem": enable_filesystem,
-            "gdt_runtime": enable_gdt,
+            "filesystem": fs_on,
+            "ext2": fs_on,
+            "virtio_blk": fs_on,
+            "network": enable_network,
+            "virtio_net": enable_network,
+            "gdt_runtime": enable_gdt or enable_user_mode or enable_paging,
         }
 
         self._boot_functions: List[KernelFunction] = []
@@ -204,7 +239,10 @@ class Kernel:
         return decorator
 
     def seed_file(self, path: str, data) -> None:
-        self.require_capability("filesystem")
+        self.require_capability(
+            "filesystem",
+            "Enable with Kernel(enable_filesystem=True) or Kernel(enable_ext2=True)",
+        )
         if isinstance(data, str):
             data = data.encode("ascii", errors="replace")
         self._seed_files[path.lstrip("/")] = data
@@ -244,13 +282,14 @@ class Kernel:
             return builder.build_bin(output)
         raise ValueError(f"Unknown format: {format}")
 
-    def run(self, image_path: str = None, debug: bool = False):
+    def run(self, image_path: str = None, debug: bool = False, disk: str = None, network: bool = False):
         from ..emulator import QEMURunner
 
         if image_path is None:
             image_path = self.build("temp_os.bin")
+        disk_path = disk or self.config.rootfs_path
         runner = QEMURunner(self.config.arch)
-        runner.run(image_path, debug=debug)
+        runner.run(image_path, debug=debug, disk=disk_path, network=network or self.config.enable_network)
 
     def get_info(self) -> Dict[str, Any]:
         return {
@@ -264,6 +303,10 @@ class Kernel:
             "user_mode": self.config.enable_user_mode,
             "processes": self.config.enable_processes,
             "filesystem": self.config.enable_filesystem,
+            "ext2": self.config.enable_ext2,
+            "network": self.config.enable_network,
+            "linux_abi": self.config.enable_linux_abi,
+            "rootfs_path": self.config.rootfs_path,
             "boot_functions": len(self._boot_functions),
             "keypress_handlers": len(self._keypress_handlers),
             "timer_handlers": len(self._timer_handlers),

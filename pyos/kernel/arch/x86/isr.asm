@@ -114,18 +114,27 @@ irq_common:
     sti
     iret
 
+; Linux i386 int 0x80: args in ebx,ecx,edx,esi,edi,ebp; return in eax.
+; Write C return value into the pusha-saved eax slot before popa.
 syscall_common:
     pusha
     mov eax, [esp + 28]
     mov ebx, [esp + 16]
     mov ecx, [esp + 24]
     mov edx, [esp + 20]
+    mov esi, [esp + 4]
+    mov edi, [esp + 0]
+    mov ebp, [esp + 8]
+    push ebp
+    push edi
+    push esi
     push edx
     push ecx
     push ebx
     push eax
     call syscall_handler_c
-    add esp, 16
+    add esp, 28
+    mov [esp + 28], eax
     popa
     add esp, 8
     sti

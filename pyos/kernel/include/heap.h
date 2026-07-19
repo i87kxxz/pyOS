@@ -8,6 +8,7 @@ void *heap_malloc(u32 size);
 void heap_free(void *ptr);
 void *heap_calloc(u32 count, u32 size);
 void *heap_realloc(void *ptr, u32 size);
+void *heap_aligned_alloc(u32 alignment, u32 size);
 void heap_memset(void *dst, int value, u32 size);
 void heap_memcpy(void *dst, const void *src, u32 size);
 u32 heap_used(void);

@@ -23,7 +23,7 @@ class File:
         if k is None or not k.capabilities.get("filesystem"):
             raise CapabilityError(
                 "filesystem",
-                "Enable with Kernel(enable_filesystem=True) once Phase 5 runtime is linked",
+                "Enable with Kernel(enable_filesystem=True) or Kernel(enable_ext2=True)",
             )
 
     @classmethod

@@ -23,7 +23,7 @@ class Process:
         if k is None or not k.capabilities.get("processes"):
             raise CapabilityError(
                 "processes",
-                "Enable with Kernel(enable_processes=True) once Phase 4 runtime is linked",
+                "Enable with Kernel(enable_processes=True)",
             )
 
     @classmethod

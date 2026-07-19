@@ -1,5 +1,7 @@
 """
 pyOS System Call numbers — must stay in sync with kernel/include/syscall.h
+
+Default numbers match Linux i386 (syscall_32.tbl).
 """
 
 from __future__ import annotations
@@ -12,18 +14,63 @@ from .errors import UnsupportedOpError
 
 
 class SysCallNumber(Enum):
+    # Linux i386
     SYS_EXIT = 1
+    SYS_FORK = 2
     SYS_READ = 3
     SYS_WRITE = 4
     SYS_OPEN = 5
     SYS_CLOSE = 6
+    SYS_WAITPID = 7
+    SYS_EXECVE = 11
+    SYS_CHDIR = 12
+    SYS_TIME = 13
     SYS_GETPID = 20
-    SYS_MALLOC = 90
-    SYS_FREE = 91
-    SYS_SLEEP = 162
-    SYS_TIME = 201
+    SYS_GETUID = 24
+    SYS_DUP = 41
+    SYS_PIPE = 42
+    SYS_BRK = 45
+    SYS_GETGID = 47
+    SYS_IOCTL = 54
+    SYS_FCNTL = 55
+    SYS_DUP2 = 63
+    SYS_SELECT = 82
+    SYS_MMAP = 90
+    SYS_MUNMAP = 91
+    SYS_SOCKETCALL = 102
+    SYS_STAT = 106
+    SYS_LSTAT = 107
+    SYS_FSTAT = 108
+    SYS_UNAME = 109
+    SYS_WAIT4 = 114
+    SYS_MPROTECT = 125
+    SYS_SCHED_YIELD = 158
+    SYS_NANOSLEEP = 162
+    SYS_POLL = 168
+    SYS_RT_SIGACTION = 174
+    SYS_RT_SIGPROCMASK = 175
+    SYS_GETCWD = 183
+    SYS_MMAP2 = 192
+    SYS_GETDENTS = 141
+    SYS_GETDENTS64 = 220
+    SYS_SET_THREAD_AREA = 243
+    SYS_EXIT_GROUP = 252
+    SYS_ACCESS = 33
+    SYS_GETEUID = 49
+    SYS_GETEGID = 50
+    SYS_GETPPID = 64
+    SYS_UGETRLIMIT = 191
+    SYS_OPENAT = 295
+    SYS_FACCESSAT = 307
+
+    # DSL aliases (same values as Linux counterparts)
     SYS_YIELD = 158
-    SYS_SPAWN = 2
+    SYS_SLEEP = 162
+
+    # Non-Linux pyOS extensions
+    PYOS_SYS_MALLOC = 0x70000001
+    PYOS_SYS_FREE = 0x70000002
+    PYOS_SYS_SPAWN = 0x70000003
 
 
 @dataclass

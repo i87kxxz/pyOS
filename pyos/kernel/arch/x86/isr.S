@@ -93,6 +93,7 @@ S(isr_stub_128):
 .extern S(fault_handler)
 .extern S(irq_handler)
 .extern S(syscall_handler_c)
+.extern S(task_save_user_frame)
 
 isr_common:
     pusha
@@ -120,18 +121,56 @@ irq_common:
     sti
     iret
 
+/*
+ * Linux i386 int 0x80 ABI:
+ *   eax=num, ebx/ecx/edx/esi/edi/ebp = args 1..6, return in eax.
+ *
+ * After pusha the stack is:
+ *   [esp+0]=edi [esp+4]=esi [esp+8]=ebp [esp+12]=esp
+ *   [esp+16]=ebx [esp+20]=edx [esp+24]=ecx [esp+28]=eax
+ *   [esp+32]=int_no [esp+36]=err
+ *   [esp+40]=eip [esp+44]=cs [esp+48]=eflags
+ *   [esp+52]=user_esp [esp+56]=ss   (only if CPL changed)
+ *
+ * Stash the C return value into the saved-eax slot before popa so userspace
+ * sees the result (popa would otherwise restore the pre-syscall eax).
+ */
 syscall_common:
     pusha
+    /* If privilege changed (ring3), save user frame for fork. */
+    movl 44(%esp), %eax          /* CS */
+    testl $3, %eax
+    jz 1f
+    movl 40(%esp), %ebx          /* EIP */
+    movl 44(%esp), %ecx          /* CS */
+    movl 48(%esp), %edx          /* EFLAGS */
+    movl 52(%esp), %esi          /* user ESP */
+    movl 56(%esp), %edi          /* SS */
+    pushl %edi
+    pushl %esi
+    pushl %edx
+    pushl %ecx
+    pushl %ebx
+    call S(task_save_user_frame)
+    addl $20, %esp
+1:
     movl 28(%esp), %eax
     movl 16(%esp), %ebx
     movl 24(%esp), %ecx
     movl 20(%esp), %edx
+    movl 4(%esp), %esi
+    movl 0(%esp), %edi
+    movl 8(%esp), %ebp
+    pushl %ebp
+    pushl %edi
+    pushl %esi
     pushl %edx
     pushl %ecx
     pushl %ebx
     pushl %eax
     call S(syscall_handler_c)
-    addl $16, %esp
+    addl $28, %esp
+    movl %eax, 28(%esp)
     popa
     addl $8, %esp
     sti

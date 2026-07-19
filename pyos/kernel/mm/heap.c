@@ -33,10 +33,16 @@ static void split_block(Block *b, u32 size) {
     }
 }
 
+static void coalesce_forward(Block *b) {
+    while (b->next && b->next->free) {
+        b->size += sizeof(Block) + b->next->size;
+        b->next = b->next->next;
+    }
+}
+
 void *heap_malloc(u32 size) {
     if (size == 0) return NULL;
     size = (size + 3u) & ~3u;
-    Block *prev = 0;
     Block *cur = free_list;
     while (cur) {
         if (cur->free && cur->size >= size) {
@@ -45,9 +51,7 @@ void *heap_malloc(u32 size) {
             used_bytes += cur->size + sizeof(Block);
             return (void *)((u8 *)cur + sizeof(Block));
         }
-        prev = cur;
         cur = cur->next;
-        (void)prev;
     }
     pyos_panic(
         "@kernel Memory.malloc",
@@ -57,18 +61,49 @@ void *heap_malloc(u32 size) {
     return NULL;
 }
 
+void *heap_aligned_alloc(u32 alignment, u32 size) {
+    if (alignment < 4u) alignment = 4u;
+    /* Round alignment down to power-of-two if needed. */
+    if (alignment & (alignment - 1u)) {
+        u32 a = 4u;
+        while (a < alignment) a <<= 1;
+        alignment = a;
+    }
+    if (size == 0) return NULL;
+    u32 need = size + alignment;
+    u8 *raw = (u8 *)heap_malloc(need);
+    if (!raw) return NULL;
+    u32 addr = ((u32)raw + alignment - 1u) & ~(alignment - 1u);
+    return (void *)addr;
+}
+
 void heap_free(void *ptr) {
     if (!ptr) return;
     Block *b = (Block *)((u8 *)ptr - sizeof(Block));
     if ((u8 *)b < heap_base || (u8 *)b >= heap_base + heap_size) return;
     if (b->free) return;
+    /* Ensure b is a real heap block on the list (rejects interior aligned ptrs). */
+    Block *cur = free_list;
+    pyos_bool found = PYOS_FALSE;
+    while (cur) {
+        if (cur == b) {
+            found = PYOS_TRUE;
+            break;
+        }
+        cur = cur->next;
+    }
+    if (!found) return;
     b->free = 1;
     if (used_bytes >= b->size + sizeof(Block))
         used_bytes -= b->size + sizeof(Block);
-    /* coalesce forward */
-    if (b->next && b->next->free) {
-        b->size += sizeof(Block) + b->next->size;
-        b->next = b->next->next;
+    coalesce_forward(b);
+    cur = free_list;
+    while (cur && cur->next) {
+        if (cur->free && cur->next == b) {
+            coalesce_forward(cur);
+            break;
+        }
+        cur = cur->next;
     }
 }
 

@@ -1,12 +1,11 @@
 """
-pyOS Builder — bootloader (ASM) + C kernel via MinGW-w64
+pyOS Builder — Multiboot ELF kernel (QEMU -kernel) via MinGW-w64
 """
 
 from __future__ import annotations
 
 import json
 import shutil
-import struct
 import subprocess
 import tempfile
 from pathlib import Path
@@ -27,10 +26,12 @@ class BuildError(Exception):
         super().__init__(full)
 
 
-class OSBuilder:
-    """Builds floppy OS images from Python kernel + C kernel sources."""
+# Soft cap so runaway glue cannot fill the disk; far above the old 64-sector floppy limit.
+MAX_KERNEL_BYTES = 8 * 1024 * 1024
 
-    KERNEL_SECTORS = 64  # must match bootloader.asm
+
+class OSBuilder:
+    """Builds Multiboot ELF kernels from Python DSL + C kernel sources."""
 
     def __init__(self, kernel: "Kernel"):
         self.kernel = kernel
@@ -56,6 +57,7 @@ class OSBuilder:
         return [
             ("start.o", k / "arch" / "x86" / "start.S"),
             ("isr.o", k / "arch" / "x86" / "isr.S"),
+            ("switch.o", k / "arch" / "x86" / "switch.S"),
             ("debug.o", k / "lib" / "debug.c"),
             ("string.o", k / "lib" / "string.c"),
             ("screen.o", k / "drivers" / "screen.c"),
@@ -75,6 +77,13 @@ class OSBuilder:
             ("vfs.o", k / "fs" / "vfs.c"),
             ("ramfs.o", k / "fs" / "ramfs.c"),
             ("fat12.o", k / "fs" / "fat12.c"),
+            ("ext2.o", k / "fs" / "ext2.c"),
+            ("pci.o", k / "drivers" / "pci.c"),
+            ("virtio_blk.o", k / "drivers" / "virtio_blk.c"),
+            ("virtio_net.o", k / "drivers" / "virtio_net.c"),
+            ("blkdev.o", k / "drivers" / "blkdev.c"),
+            ("net.o", k / "net" / "net.c"),
+            ("socket.o", k / "net" / "socket.c"),
             ("shell.o", k / "drivers" / "shell.c"),
             ("kmain.o", k / "kmain.c"),
         ]
@@ -82,7 +91,6 @@ class OSBuilder:
     def build_bin(self, output_path: str) -> str:
         self.toolchain.require()
         gcc = self.toolchain.gcc
-        nasm = self.toolchain.nasm
         objcopy = self.toolchain.objcopy
         if not objcopy:
             raise BuildError(
@@ -102,13 +110,6 @@ class OSBuilder:
             glue_c = tmpdir / "glue.c"
             glue_c.write_text(glue, encoding="utf-8")
 
-            boot_bin = tmpdir / "bootloader.bin"
-            self._run(
-                [nasm, "-f", "bin", str(self.bootloader_path), "-o", str(boot_bin)],
-                where="NASM bootloader",
-                hint="Check pyos/boot/bootloader.asm",
-            )
-
             include = str(self.kernel_dir / "include")
             cflags = [
                 "-m32",
@@ -118,6 +119,11 @@ class OSBuilder:
                 "-fno-pic",
                 "-fno-asynchronous-unwind-tables",
                 "-fno-exceptions",
+                # Freestanding i386: never emit SSE (QEMU boots without OSFXSR → #UD).
+                "-mno-sse",
+                "-mno-sse2",
+                "-mno-mmx",
+                "-mfpmath=387",
                 "-nostdlib",
                 "-Wall",
                 "-Wextra",
@@ -150,9 +156,9 @@ class OSBuilder:
             )
             objects.append(glue_o)
 
-            kernel_bin = tmpdir / "kernel.bin"
             map_file = tmpdir / "kernel.map"
             pe = tmpdir / "kernel.pe"
+            elf = tmpdir / "kernel.elf"
             ld = self.toolchain.ld
             if ld:
                 self._run(
@@ -188,21 +194,25 @@ class OSBuilder:
                     ],
                     where="GCC link kernel",
                 )
+
+            # MinGW links PE; QEMU Multiboot -kernel expects ELF32.
             self._run(
-                [objcopy, "-O", "binary", str(pe), str(kernel_bin)],
-                where="objcopy PE -> flat binary",
+                [objcopy, "-O", "elf32-i386", str(pe), str(elf)],
+                where="objcopy PE -> Multiboot ELF32",
             )
 
-            boot_data = boot_bin.read_bytes()
-            if len(boot_data) != 512 or boot_data[-2:] != b"\x55\xaa":
-                raise BuildError("Bootloader invalid (need 512 bytes ending 0x55AA)")
-
-            kernel_data = kernel_bin.read_bytes()
-            max_kernel = self.KERNEL_SECTORS * 512
-            if len(kernel_data) > max_kernel:
+            kernel_data = elf.read_bytes()
+            if len(kernel_data) < 4 or kernel_data[:4] != b"\x7fELF":
+                raise BuildError("objcopy did not produce a valid ELF kernel image")
+            if b"\x02\xb0\xad\x1b" not in kernel_data[:8192]:
                 raise BuildError(
-                    f"Kernel too large ({len(kernel_data)} > {max_kernel})",
-                    "Raise KERNEL_SECTORS in bootloader.asm and OSBuilder",
+                    "Multiboot header magic missing in first 8KiB",
+                    "Check .multiboot section in start.S / linker.ld",
+                )
+            if len(kernel_data) > MAX_KERNEL_BYTES:
+                raise BuildError(
+                    f"Kernel too large ({len(kernel_data)} > {MAX_KERNEL_BYTES})",
+                    "Reduce glue/heap seeds or raise MAX_KERNEL_BYTES in builder.py",
                 )
 
             out = Path(output_path)
@@ -215,51 +225,30 @@ class OSBuilder:
                         "kernel_bytes": len(kernel_data),
                         "heap_size": self.kernel.config.heap_size,
                         "capabilities": self.kernel.capabilities,
+                        "boot": "multiboot-elf",
                     },
                     indent=2,
                 ),
                 encoding="utf-8",
             )
 
-            floppy_size = 1474560
-            image = bytearray(floppy_size)
-            image[0:512] = boot_data
-            image[512 : 512 + len(kernel_data)] = kernel_data
-
-            # Optional FAT12 seed region after kernel (Phase 5)
-            if self.kernel.config.enable_filesystem and self.kernel._seed_files:
-                fat_blob = self._build_fat12_seeds(self.kernel._seed_files)
-                fat_off = 512 + self.KERNEL_SECTORS * 512
-                if fat_off + len(fat_blob) > floppy_size:
-                    raise BuildError("FAT seed data exceeds floppy size")
-                image[fat_off : fat_off + len(fat_blob)] = fat_blob
-
-            out.write_bytes(bytes(image))
+            out.write_bytes(kernel_data)
 
             if map_file.exists():
                 shutil.copy(map_file, out.with_suffix(out.suffix + ".map"))
 
         return str(output_path)
 
-    def _build_fat12_seeds(self, seeds: dict) -> bytes:
-        """Minimal embedded file table: count + (name[11] + size u32 + data)*n"""
-        parts = [struct.pack("<I", len(seeds))]
-        for name, data in seeds.items():
-            n = name.upper().replace("/", "_")[:11].ljust(11)
-            parts.append(n.encode("ascii", errors="replace"))
-            parts.append(struct.pack("<I", len(data)))
-            parts.append(data)
-        return b"".join(parts)
-
     def build_iso(self, output_path: str) -> str:
+        """ISO format currently emits the same Multiboot ELF (boot with qemu -kernel)."""
         out = Path(output_path)
         bin_path = out.with_suffix(".bin") if out.suffix.lower() == ".iso" else out
         self.build_bin(str(bin_path))
         if out.suffix.lower() == ".iso":
             shutil.copy(bin_path, out)
             print(
-                f"Warning: floppy-boot image at {out} (not GRUB ISO). "
-                f"Run: qemu-system-i386 -fda {out}"
+                f"Warning: Multiboot ELF written to {out} (not a GRUB ISO). "
+                f"Run: qemu-system-i386 -kernel {out}"
             )
         return str(out)
 

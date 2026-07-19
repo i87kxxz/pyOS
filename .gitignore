@@ -38,6 +38,7 @@ __pycache__/
 build/
 !pyos/build/
 !pyos/build/**
+pyos/build/__pycache__/
 develop-eggs/
 dist/
 downloads/

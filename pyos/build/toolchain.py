@@ -184,7 +184,18 @@ class Toolchain:
         return items
 
     def require(self) -> None:
-        problems = [s for s in self.status() if not s.ok]
+        # Multiboot ELF builds need gcc -m32 (+ objcopy next to it). NASM/QEMU are optional.
+        problems = [s for s in self.status() if not s.ok and s.name.startswith("gcc")]
+        if not self.objcopy:
+            problems.append(
+                ToolStatus(
+                    "objcopy",
+                    None,
+                    None,
+                    False,
+                    "objcopy not found next to MinGW gcc",
+                )
+            )
         if not problems:
             return
         lines = ["pyOS build tools are incomplete:", ""]
