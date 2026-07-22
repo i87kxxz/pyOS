@@ -14,7 +14,7 @@ from .debug import explain_build_error, format_serial_log, load_symbol_hints
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="pyOS")
+@click.version_option(version="1.0.1", prog_name="pyOS")
 def main():
     """
     pyOS - Build real operating systems with a Python DSL.
@@ -80,7 +80,9 @@ def build(source: str, output: str, fmt: str, arch: str, verbose: bool):
 @click.option("--gdb", "gdb_mode", is_flag=True, help="Pause and wait for GDB on :1234")
 @click.option("--disk", default=None, type=click.Path(exists=True), help="ext2 rootfs disk image (virtio-blk)")
 @click.option("--net/--no-net", default=False, help="Attach virtio-net (user networking)")
-def run(image: str, memory: int, gdb_mode: bool, disk: Optional[str], net: bool):
+@click.option("--headless", is_flag=True, help="Run without opening a QEMU window")
+@click.option("--timeout", default=0, show_default=True, help="Stop after N seconds (0 = wait until closed)")
+def run(image: str, memory: int, gdb_mode: bool, disk: Optional[str], net: bool, headless: bool, timeout: int):
     """Run OS image in QEMU."""
     from .emulator import QEMURunner, QEMUError
 
@@ -92,10 +94,16 @@ def run(image: str, memory: int, gdb_mode: bool, disk: Optional[str], net: bool)
     try:
         runner = QEMURunner()
         process = runner.run(
-            image, memory=memory, debug=gdb_mode, serial_stdio=False, disk=disk, network=net
+            image, memory=memory, debug=gdb_mode, serial_stdio=headless, disk=disk, network=net
         )
-        click.echo("QEMU started. Close the window to exit.")
-        process.wait()
+        click.echo("QEMU started. Close the window to exit." if not headless else "QEMU started in headless mode.")
+        if timeout > 0:
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.terminate()
+        else:
+            process.wait()
     except QEMUError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

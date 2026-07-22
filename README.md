@@ -66,6 +66,10 @@ Honest limits (not a full Linux distro): see [docs/LINUX_ABI.md](docs/LINUX_ABI.
 20. [Contributing](#contributing)
 21. [License](#license)
 
+### New here?
+
+Start with the beginner-friendly [guide](docs/BEGINNER_GUIDE.md). It covers installation, the first build, common errors, and the difference between Python build code and the C kernel.
+
 ---
 
 ## How it works (Python vs C)
@@ -285,7 +289,7 @@ kernel.seed_file("x.txt", "nope")
 
 # raises UnsupportedOpError / ValueError for bad ops / colors / non-ASCII VGA text
 Screen.set_color("not_a_color")
-Screen.print("عربي")  # VGA text is ASCII/CP437 only
+Screen.print("Arabic text")  # VGA text is ASCII/CP437 only
 ```
 
 ---

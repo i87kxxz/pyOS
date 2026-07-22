@@ -68,3 +68,10 @@ pyos = [
     "kernel/*.ld",
     "kernel/include/*.h",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "qemu: launches a real QEMU guest; opt in with PYOS_RUN_QEMU=1",
+]
+addopts = "-ra"
